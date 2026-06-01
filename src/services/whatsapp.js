@@ -1,50 +1,26 @@
 const axios = require('axios');
 
-const EVOLUTION_URL = process.env.EVOLUTION_URL;
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'barbara-clinica';
-const EVOLUTION_KEY = process.env.EVOLUTION_API_KEY;
+const ZAPI_INSTANCE = process.env.ZAPI_INSTANCE_ID;
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
+const ZAPI_URL = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}`;
 
-// Mapeamento @lid -> JID real (ex: 5595...@s.whatsapp.net)
-const lidMap = {};
-
-function registrarContato(lid, jidReal) {
-  if (lid && jidReal) {
-    const lidKey = lid.replace('@lid', '').replace('@s.whatsapp.net', '');
-    lidMap[lidKey] = jidReal;
-    console.log(`[contatos] mapeado ${lidKey} -> ${jidReal}`);
-  }
-}
-
-async function enviarTexto(jid, texto, canal = 'whatsapp') {
+async function enviarTexto(telefone, texto, canal = 'whatsapp') {
   try {
-    let number = jid;
+    // Z-API aceita numero no formato 5595XXXXXXXX (sem + e sem @)
+    const numero = telefone.replace('@s.whatsapp.net', '').replace('@lid', '').replace('+', '');
 
-    if (jid.includes('@lid')) {
-      const lidKey = jid.replace('@lid', '');
-      if (lidMap[lidKey]) {
-        number = lidMap[lidKey];
-        console.log(`[whatsapp] @lid resolvido: ${jid} -> ${number}`);
-      } else {
-        console.log(`[whatsapp] @lid sem mapeamento ainda: ${jid}`);
-        // Tenta mesmo assim — pode funcionar em versoes mais novas
-        number = jid;
-      }
-    }
-
-    console.log(`[whatsapp] enviando para ${number}`);
+    console.log(`[whatsapp] enviando para ${numero}`);
 
     await axios.post(
-      `${EVOLUTION_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+      `${ZAPI_URL}/send-text`,
       {
-        number,
-        options: { delay: 1000 },
-        textMessage: { text: texto }
-      },
-      { headers: { apikey: EVOLUTION_KEY } }
+        phone: numero,
+        message: texto
+      }
     );
   } catch (err) {
     console.error('[whatsapp] Erro ao enviar:', JSON.stringify(err.response?.data) || err.message);
   }
 }
 
-module.exports = { enviarTexto, registrarContato };
+module.exports = { enviarTexto };

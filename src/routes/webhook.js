@@ -1,73 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const { processarMensagem } = require('../services/messageHandler');
-const { registrarContato } = require('../services/whatsapp');
 
 router.post('/', async (req, res) => {
   res.sendStatus(200);
 
   try {
     const body = req.body;
-
-    // Capturar mapeamento de contatos (@lid -> numero real)
-    if (body.event === 'contacts.upsert') {
-      const contatos = Array.isArray(body.data) ? body.data : [body.data];
-      for (const contato of contatos) {
-        if (contato?.id && contato?.lid) {
-          registrarContato(contato.lid, contato.id);
-        } else if (contato?.remoteJid && contato?.lid) {
-          registrarContato(contato.lid, contato.remoteJid);
-        }
-      }
-      return;
-    }
-
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
-    if (body.event !== 'messages.upsert') return;
+    // Ignorar mensagens enviadas pelo próprio sistema
+    if (body.fromMe) return;
 
-    const data = body.data;
-    if (!data) return;
+    // Ignorar mensagens de grupo
+    if (body.isGroup) return;
 
-    if (data.key?.fromMe) return;
-    if (data.key?.remoteJid?.includes('@g.us')) return;
+    // Verificar se tem texto
+    const texto = body.text?.message || body.audio?.audioUrl || null;
+    if (!texto && body.type !== 'ReceivedCallback') return;
 
-    const remoteJid = data.key?.remoteJid || '';
-    if (!remoteJid) return;
-
-    const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+    const telefone = body.phone;
     if (!telefone) return;
 
-    console.log(`[webhook] processando mensagem de ${telefone} (jid: ${remoteJid})`);
+    const nome = body.senderName || telefone;
 
-    const contato = {
-      profile: {
-        name: data.pushName || telefone
-      }
-    };
+    console.log(`[webhook] processando mensagem de ${telefone} — ${nome}`);
 
     let msgFormatada = {
       from: telefone,
-      fromJid: remoteJid,
+      fromJid: telefone,
       type: 'text',
       text: { body: '' }
     };
 
-    if (data.message?.conversation) {
-      msgFormatada.text.body = data.message.conversation;
-    } else if (data.message?.extendedTextMessage?.text) {
-      msgFormatada.text.body = data.message.extendedTextMessage.text;
-    } else if (data.message?.audioMessage) {
+    if (body.type === 'ReceivedCallback' && body.text?.message) {
+      msgFormatada.text.body = body.text.message;
+    } else if (body.audio?.audioUrl) {
       msgFormatada.type = 'audio';
-      msgFormatada.audio = { id: data.message.audioMessage.url || '' };
-    } else if (data.message?.imageMessage?.caption) {
-      msgFormatada.text.body = data.message.imageMessage.caption;
+      msgFormatada.audio = { id: body.audio.audioUrl };
+    } else if (body.text?.message) {
+      msgFormatada.text.body = body.text.message;
     } else {
-      console.log('[webhook] tipo nao suportado:', data.messageType);
+      console.log('[webhook] tipo nao suportado:', body.type);
       return;
     }
 
     if (msgFormatada.type === 'text' && !msgFormatada.text.body.trim()) return;
+
+    const contato = { profile: { name: nome } };
 
     await processarMensagem(msgFormatada, contato, 'whatsapp');
   } catch (err) {
