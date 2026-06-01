@@ -74,6 +74,19 @@ function ativarModoHumano(telefone) {
   );
 }
 
+function desativarModoHumano(telefone) {
+  return new Promise((resolve) => {
+    db.run(
+      `UPDATE contatos SET modo_humano=0, atualizado_em=strftime('%s','now') WHERE telefone=?`,
+      [telefone],
+      (err) => {
+        if (err) console.error('[db] Erro ao desativar modo humano:', err.message);
+        resolve();
+      }
+    );
+  });
+}
+
 function verificarModoHumano(telefone) {
   return new Promise((resolve) => {
     db.get(`SELECT modo_humano FROM contatos WHERE telefone = ?`, [telefone], (err, row) => {
@@ -82,4 +95,4 @@ function verificarModoHumano(telefone) {
   });
 }
 
-module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, ativarModoHumano, verificarModoHumano };
+module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, ativarModoHumano, desativarModoHumano, verificarModoHumano };

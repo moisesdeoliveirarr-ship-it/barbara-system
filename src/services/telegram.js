@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { getAviso, setAviso, limparAviso } = require('../db/aviso');
-const { ativarModoHumano } = require('../db/historico');
+const { ativarModoHumano, desativarModoHumano } = require('../db/historico');
 
 let bot = null;
 
@@ -44,18 +44,36 @@ function iniciarTelegram() {
     await bot.sendMessage(msg.chat.id, `Aviso registrado:\n"${texto}"\n\nFica ativo ate voce mandar /limpar`);
   });
 
-  // Botão inline: silenciar Sara para um contato
+  // Botões inline: silenciar e reativar Sara
   bot.on('callback_query', async (query) => {
     const data = query.data;
+
     if (data && data.startsWith('silenciar:')) {
       const telefone = data.replace('silenciar:', '');
       await ativarModoHumano(telefone);
-      await bot.answerCallbackQuery(query.id, { text: '✅ Sara silenciada para este contato!' });
+      await bot.answerCallbackQuery(query.id, { text: '🔇 Sara pausada!' });
       await bot.editMessageReplyMarkup(
-        { inline_keyboard: [[{ text: '✅ Sara silenciada', callback_data: 'ok' }]] },
+        { inline_keyboard: [[{ text: '▶️ Reativar Sara', callback_data: `reativar:${telefone}` }]] },
         { chat_id: query.message.chat.id, message_id: query.message.message_id }
       );
     }
+
+    if (data && data.startsWith('reativar:')) {
+      const telefone = data.replace('reativar:', '');
+      await desativarModoHumano(telefone);
+      await bot.answerCallbackQuery(query.id, { text: '▶️ Sara reativada!' });
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [[{ text: '🔇 Silenciar Sara', callback_data: `silenciar:${telefone}` }]] },
+        { chat_id: query.message.chat.id, message_id: query.message.message_id }
+      );
+    }
+  });
+
+  // Comando /reativar 5595912345678
+  bot.onText(/\/reativar (.+)/, async (msg, match) => {
+    const telefone = match[1].trim();
+    await desativarModoHumano(telefone);
+    await bot.sendMessage(msg.chat.id, `▶️ Sara reativada para o contato ${telefone}.`);
   });
 
   bot.on('message', async (msg) => {
