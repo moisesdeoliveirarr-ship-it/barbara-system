@@ -9,18 +9,24 @@ router.post('/', async (req, res) => {
     const body = req.body;
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
-    // Ignorar mensagens enviadas pelo próprio sistema
+    // Ignorar mensagens enviadas pelo próprio sistema (todas as variantes do Z-API)
     if (body.fromMe === true || body.fromMe === 'true') return;
     if (body.isFromMe === true || body.isFromMe === 'true') return;
     if (body.isSentByMe === true || body.isSentByMe === 'true') return;
     if (body.type === 'SendedCallback') return;
+    if (body.type === 'DeliveryCallback') return;
+    if (body.type === 'ReadCallback') return;
+
+    // Ignorar se o remetente é o próprio número do bot
+    const botPhone = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    if (botPhone && body.phone && String(body.phone) === String(botPhone)) return;
 
     // Ignorar mensagens de grupo
     if (body.isGroup) return;
 
-    // Verificar se tem texto
+    // Só processar ReceivedCallback com texto ou áudio
     const texto = body.text?.message || body.audio?.audioUrl || null;
-    if (!texto && body.type !== 'ReceivedCallback') return;
+    if (!texto) return;
 
     const telefone = body.phone;
     if (!telefone) return;
