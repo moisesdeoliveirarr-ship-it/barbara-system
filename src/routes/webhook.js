@@ -16,23 +16,20 @@ router.post('/', async (req, res) => {
     const data = body.data;
     if (!data) return;
 
-    const msg = data.message || data;
-    if (!msg) return;
-
-    // Ignorar mensagens enviadas pelo próprio sistema
-    if (msg.key?.fromMe) return;
-
-    // Ignorar grupos
-    if (msg.key?.remoteJid?.includes('@g.us')) return;
+    // data é o objeto principal com key, pushName, message
+    if (data.key?.fromMe) return;
+    if (data.key?.remoteJid?.includes('@g.us')) return;
 
     // Extrair telefone — suporta @s.whatsapp.net e @lid
-    const remoteJid = msg.key?.remoteJid || '';
+    const remoteJid = data.key?.remoteJid || '';
     const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
     if (!telefone) return;
 
+    console.log(`[webhook] processando mensagem de ${telefone}`);
+
     const contato = {
       profile: {
-        name: msg.pushName || telefone
+        name: data.pushName || telefone
       }
     };
 
@@ -43,17 +40,17 @@ router.post('/', async (req, res) => {
       text: { body: '' }
     };
 
-    if (msg.message?.conversation) {
-      msgFormatada.text.body = msg.message.conversation;
-    } else if (msg.message?.extendedTextMessage?.text) {
-      msgFormatada.text.body = msg.message.extendedTextMessage.text;
-    } else if (msg.message?.audioMessage) {
+    if (data.message?.conversation) {
+      msgFormatada.text.body = data.message.conversation;
+    } else if (data.message?.extendedTextMessage?.text) {
+      msgFormatada.text.body = data.message.extendedTextMessage.text;
+    } else if (data.message?.audioMessage) {
       msgFormatada.type = 'audio';
-      msgFormatada.audio = { id: msg.message.audioMessage.url || '' };
-    } else if (msg.message?.imageMessage?.caption) {
-      msgFormatada.text.body = msg.message.imageMessage.caption;
+      msgFormatada.audio = { id: data.message.audioMessage.url || '' };
+    } else if (data.message?.imageMessage?.caption) {
+      msgFormatada.text.body = data.message.imageMessage.caption;
     } else {
-      console.log('[webhook] tipo de mensagem nao suportado');
+      console.log('[webhook] tipo de mensagem nao suportado:', data.messageType);
       return;
     }
 
