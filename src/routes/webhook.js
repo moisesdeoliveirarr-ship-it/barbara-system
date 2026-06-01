@@ -1,12 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const { processarMensagem } = require('../services/messageHandler');
+const { registrarContato } = require('../services/whatsapp');
 
 router.post('/', async (req, res) => {
   res.sendStatus(200);
 
   try {
     const body = req.body;
+
+    // Capturar mapeamento de contatos (@lid -> numero real)
+    if (body.event === 'contacts.upsert') {
+      const contatos = Array.isArray(body.data) ? body.data : [body.data];
+      for (const contato of contatos) {
+        if (contato?.id && contato?.lid) {
+          registrarContato(contato.lid, contato.id);
+        } else if (contato?.remoteJid && contato?.lid) {
+          registrarContato(contato.lid, contato.remoteJid);
+        }
+      }
+      return;
+    }
+
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
     if (body.event !== 'messages.upsert') return;
@@ -20,8 +35,6 @@ router.post('/', async (req, res) => {
     const remoteJid = data.key?.remoteJid || '';
     if (!remoteJid) return;
 
-    // Para envio: usar o JID completo (Evolution API aceita @lid e @s.whatsapp.net)
-    // Para identificação interna: limpar o sufixo
     const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
     if (!telefone) return;
 
@@ -35,7 +48,7 @@ router.post('/', async (req, res) => {
 
     let msgFormatada = {
       from: telefone,
-      fromJid: remoteJid, // JID completo para envio
+      fromJid: remoteJid,
       type: 'text',
       text: { body: '' }
     };
