@@ -1,31 +1,34 @@
 const axios = require('axios');
 
-const ZAPI_INSTANCE = process.env.ZAPI_INSTANCE_ID;
-const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
-const ZAPI_URL = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}`;
+const BASE_URL = 'https://graph.facebook.com/v19.0';
 
 async function enviarTexto(telefone, texto, canal = 'whatsapp') {
   try {
-    // Z-API aceita numero no formato 5595XXXXXXXX (sem + e sem @)
-    const numero = telefone.replace('@s.whatsapp.net', '').replace('@lid', '').replace('+', '');
-
-    console.log(`[whatsapp] enviando para ${numero}`);
-
+    console.log(`[whatsapp] enviando para ${telefone}`);
     await axios.post(
-      `${ZAPI_URL}/send-text`,
+      `${BASE_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
-        phone: numero,
-        message: texto
+        messaging_product: 'whatsapp',
+        to: telefone,
+        type: 'text',
+        text: { body: texto }
       },
-      {
-        headers: {
-          'Client-Token': process.env.ZAPI_CLIENT_TOKEN
-        }
-      }
+      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` } }
     );
   } catch (err) {
     console.error('[whatsapp] Erro ao enviar:', JSON.stringify(err.response?.data) || err.message);
   }
 }
 
-module.exports = { enviarTexto };
+async function baixarMidiaWhatsapp(mediaId) {
+  const { data: info } = await axios.get(`${BASE_URL}/${mediaId}`, {
+    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` }
+  });
+  const { data: buffer } = await axios.get(info.url, {
+    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` },
+    responseType: 'arraybuffer'
+  });
+  return { buffer: Buffer.from(buffer), mimeType: info.mime_type };
+}
+
+module.exports = { enviarTexto, baixarMidiaWhatsapp };

@@ -1,22 +1,19 @@
 const axios = require('axios');
 const FormData = require('form-data');
+const { baixarMidiaWhatsapp } = require('./whatsapp');
 
-async function transcreverAudio(audioUrl) {
+async function transcreverAudio(mediaId) {
   try {
     if (!process.env.GROQ_API_KEY) {
       console.warn('[transcricao] GROQ_API_KEY nao configurada');
       return null;
     }
 
-    // Baixar o audio da URL do Z-API
-    const { data: buffer, headers } = await axios.get(audioUrl, {
-      responseType: 'arraybuffer'
-    });
+    // Baixar audio via Meta API
+    const { buffer, mimeType } = await baixarMidiaWhatsapp(mediaId);
+    const extensao = mimeType?.includes('ogg') ? 'ogg' : mimeType?.includes('mp4') ? 'mp4' : 'ogg';
 
-    const mimeType = headers['content-type'] || 'audio/ogg';
-    const extensao = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'ogg';
-
-    return await transcreverGroq(Buffer.from(buffer), extensao);
+    return await transcreverGroq(buffer, extensao);
   } catch (err) {
     console.error('[transcricao] Erro:', err.message);
     return null;

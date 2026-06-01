@@ -1,20 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { buscarHistorico, salvarMensagem, buscarCanal, ativarModoHumano, verificarModoHumano } = require('../db/historico');
+const { buscarHistorico, salvarMensagem, buscarCanal, ativarModoHumano, desativarModoHumano, verificarModoHumano } = require('../db/historico');
 const { getAviso, setAviso, limparAviso } = require('../db/aviso');
 const { enviarTexto } = require('../services/whatsapp');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const SENHA = process.env.DASHBOARD_SENHA || 'barbara2026';
-
 const db = new sqlite3.Database(path.join(__dirname, '../../historico.db'));
 
 function autenticar(req, res, next) {
   const senha = req.query.senha || req.headers['x-senha'];
-  if (senha !== SENHA) {
-    return res.status(401).send('Acesso negado. Informe ?senha=' + SENHA);
-  }
+  if (senha !== SENHA) return res.status(401).send('Acesso negado. Informe ?senha=' + SENHA);
   next();
 }
 
@@ -40,23 +37,27 @@ router.get('/', autenticar, (req, res) => {
   .contact-item:hover { background: #202c33; }
   .contact-item.active { background: #2a3942; }
   .avatar { width: 46px; height: 46px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .avatar.humano { background: #e67e22; }
   .contact-info { flex: 1; min-width: 0; }
   .contact-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .contact-preview { font-size: 12px; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .contact-time { font-size: 11px; color: #8696a0; flex-shrink: 0; }
+  .badge-humano { font-size: 10px; background: #e67e22; color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
   #chat-panel { flex: 1; display: flex; flex-direction: column; background: #0b141a; }
   #chat-header { background: #202c33; padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a3942; flex-shrink: 0; }
   #chat-header .avatar { width: 38px; height: 38px; font-size: 15px; }
   #chat-header-info { flex: 1; }
   #chat-header-name { font-size: 15px; font-weight: 600; }
   #chat-header-phone { font-size: 12px; color: #8696a0; }
-  #btn-silenciar { background: #2a3942; border: none; border-radius: 8px; padding: 7px 14px; color: #e9edef; font-size: 13px; cursor: pointer; white-space: nowrap; }
-  #btn-silenciar.ativo { background: #8b0000; color: #fff; }
-  #btn-silenciar:hover { opacity: 0.85; }
+  #btn-assumir { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+  #btn-assumir.assumir { background: #e67e22; color: #fff; }
+  #btn-assumir.devolver { background: #00a884; color: #fff; }
+  #btn-assumir:hover { opacity: 0.85; }
   #messages { flex: 1; overflow-y: auto; padding: 12px 8%; display: flex; flex-direction: column; gap: 4px; }
-  .bubble { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; word-wrap: break-word; position: relative; }
+  .bubble { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
   .bubble.user { background: #202c33; align-self: flex-start; border-top-left-radius: 2px; }
   .bubble.assistant { background: #005c4b; align-self: flex-end; border-top-right-radius: 2px; }
+  .bubble.manual { background: #1a3a5c; align-self: flex-end; border-top-right-radius: 2px; }
   .bubble .meta { font-size: 11px; color: rgba(255,255,255,0.45); text-align: right; margin-top: 4px; }
   .date-divider { text-align: center; margin: 10px 0; }
   .date-divider span { background: #182229; color: #8696a0; font-size: 12px; padding: 4px 12px; border-radius: 8px; }
@@ -74,7 +75,7 @@ router.get('/', autenticar, (req, res) => {
 </head>
 <body>
 <div id="header">
-  <h1>Barbara System – Dashboard</h1>
+  <h1>Sara – Barbara System</h1>
   <span id="status-bar">Atualizando...</span>
 </div>
 <div id="app">
@@ -84,18 +85,19 @@ router.get('/', autenticar, (req, res) => {
   </div>
   <div id="chat-panel">
     <div id="no-chat">
-      <svg width="80" height="80" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-      <p>Selecione uma conversa para ver o historico</p>
+      <svg width="80" height="80" viewBox="0 0 24 24" style="opacity:0.2;fill:#8696a0"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+      <p>Selecione uma conversa</p>
     </div>
   </div>
 </div>
 <script>
 const SENHA = new URLSearchParams(location.search).get('senha') || '';
-const API = (path) => path + (path.includes('?') ? '&' : '?') + 'senha=' + encodeURIComponent(SENHA);
+const API = (p) => p + (p.includes('?') ? '&' : '?') + 'senha=' + encodeURIComponent(SENHA);
 let selectedPhone = null;
 let selectedName = null;
 let allContacts = [];
 let lastMsgCount = 0;
+let modoHumanoAtivo = false;
 
 async function loadContacts() {
   try {
@@ -104,11 +106,9 @@ async function loadContacts() {
     const data = await res.json();
     allContacts = data;
     renderContacts(data);
-    document.getElementById('total-contacts').textContent = data.length + ' contato(s)';
+    document.getElementById('total-contacts').textContent = ' · ' + data.length + ' contato(s)';
     document.getElementById('status-bar').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
-  } catch(e) {
-    document.getElementById('status-bar').textContent = 'Erro de conexao';
-  }
+  } catch(e) { document.getElementById('status-bar').textContent = 'Erro de conexão'; }
 }
 
 function renderContacts(contacts) {
@@ -117,10 +117,12 @@ function renderContacts(contacts) {
   el.innerHTML = contacts.map(c => {
     const initials = (c.nome || c.telefone).slice(0,2).toUpperCase();
     const active = c.telefone === selectedPhone ? ' active' : '';
+    const avatarClass = c.modo_humano ? ' humano' : '';
+    const badge = c.modo_humano ? '<span class="badge-humano">você</span>' : '';
     return \`<div class="contact-item\${active}" onclick="selectContact('\${escHtml(c.telefone)}', '\${escHtml(c.nome || '')}')">
-      <div class="avatar">\${initials}</div>
+      <div class="avatar\${avatarClass}">\${initials}</div>
       <div class="contact-info">
-        <div class="contact-name">\${escHtml(c.nome || c.telefone)}</div>
+        <div class="contact-name">\${escHtml(c.nome || c.telefone)}\${badge}</div>
         <div class="contact-preview">\${escHtml(c.ultima_mensagem || '')}</div>
       </div>
       <div class="contact-time">\${c.criado_em ? formatTime(c.criado_em) : ''}</div>
@@ -132,6 +134,8 @@ function selectContact(phone, nome) {
   selectedPhone = phone;
   selectedName = nome;
   lastMsgCount = 0;
+  const contato = allContacts.find(c => c.telefone === phone);
+  modoHumanoAtivo = contato?.modo_humano === 1;
   renderChatPanel(phone, nome || phone);
   loadMessages(true);
 }
@@ -139,6 +143,8 @@ function selectContact(phone, nome) {
 function renderChatPanel(phone, name) {
   const initials = name.slice(0,2).toUpperCase();
   const panel = document.getElementById('chat-panel');
+  const btnClass = modoHumanoAtivo ? 'devolver' : 'assumir';
+  const btnText = modoHumanoAtivo ? '▶️ Devolver para Sara' : '👤 Assumir Atendimento';
   panel.innerHTML = \`
     <div id="chat-header">
       <div class="avatar">\${escHtml(initials)}</div>
@@ -146,18 +152,36 @@ function renderChatPanel(phone, name) {
         <div id="chat-header-name">\${escHtml(name)}</div>
         <div id="chat-header-phone">\${escHtml(phone)}</div>
       </div>
-      <button id="btn-silenciar" onclick="toggleSilenciar()">🔇 Silenciar Sara</button>
+      <button id="btn-assumir" class="\${btnClass}" onclick="toggleAssumirAtendimento()">\${btnText}</button>
     </div>
     <div id="messages"><div id="loading">Carregando mensagens...</div></div>
     <div id="send-status"></div>
     <div id="input-bar">
-      <textarea id="msg-input" placeholder="Mensagem manual (enviado como Dra. Barbara)..." rows="1" onkeydown="handleKey(event)"></textarea>
+      <textarea id="msg-input" placeholder="Mensagem (enviada como Dra. Bárbara)..." rows="1" onkeydown="handleKey(event)"></textarea>
       <button id="send-btn" onclick="sendMessage()">
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
     </div>
   \`;
   renderContacts(allContacts);
+}
+
+async function toggleAssumirAtendimento() {
+  if (!selectedPhone) return;
+  const btn = document.getElementById('btn-assumir');
+  try {
+    const res = await fetch(API('/dashboard/api/silenciar/' + encodeURIComponent(selectedPhone)), { method: 'POST' });
+    const data = await res.json();
+    modoHumanoAtivo = data.modoHumano;
+    if (modoHumanoAtivo) {
+      btn.textContent = '▶️ Devolver para Sara';
+      btn.className = 'devolver';
+    } else {
+      btn.textContent = '👤 Assumir Atendimento';
+      btn.className = 'assumir';
+    }
+    loadContacts();
+  } catch(e) { alert('Erro ao alternar atendimento'); }
 }
 
 async function loadMessages(scrollBottom = false) {
@@ -176,46 +200,22 @@ function renderMessages(msgs, scrollBottom) {
   const el = document.getElementById('messages');
   if (!el) return;
   if (!msgs.length) { el.innerHTML = '<div style="text-align:center;color:#8696a0;padding:20px;font-size:13px;">Nenhuma mensagem ainda.</div>'; return; }
-  let html = '';
-  let lastDate = '';
+  let html = '', lastDate = '';
   msgs.forEach(m => {
     const d = new Date(m.criado_em * 1000);
     const dateStr = d.toLocaleDateString('pt-BR');
-    if (dateStr !== lastDate) {
-      html += \`<div class="date-divider"><span>\${dateStr}</span></div>\`;
-      lastDate = dateStr;
-    }
+    if (dateStr !== lastDate) { html += \`<div class="date-divider"><span>\${dateStr}</span></div>\`; lastDate = dateStr; }
     const time = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-    const roleLabel = m.role === 'user' ? '' : (m.role === 'manual' ? 'Dra. Barbara' : 'Bot Sara');
-    html += \`<div class="bubble \${m.role === 'user' ? 'user' : 'assistant'}">
-      \${escHtml(m.conteudo)}
-      <div class="meta">\${roleLabel ? roleLabel + ' · ' : ''}\${time}</div>
-    </div>\`;
+    const roleLabel = m.role === 'user' ? '' : m.role === 'manual' ? '✍️ Dra. Bárbara' : '🤖 Sara';
+    const bubbleClass = m.role === 'user' ? 'user' : m.role === 'manual' ? 'manual' : 'assistant';
+    html += \`<div class="bubble \${bubbleClass}">\${escHtml(m.conteudo)}<div class="meta">\${roleLabel ? roleLabel + ' · ' : ''}\${time}</div></div>\`;
   });
   el.innerHTML = html;
   if (scrollBottom) el.scrollTop = el.scrollHeight;
   else if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) el.scrollTop = el.scrollHeight;
 }
 
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-}
-
-async function toggleSilenciar() {
-  if (!selectedPhone) return;
-  const btn = document.getElementById('btn-silenciar');
-  try {
-    const res = await fetch(API('/dashboard/api/silenciar/' + encodeURIComponent(selectedPhone)), { method: 'POST' });
-    const data = await res.json();
-    if (data.modoHumano) {
-      btn.textContent = '🔇 Sara silenciada';
-      btn.classList.add('ativo');
-    } else {
-      btn.textContent = '🔇 Silenciar Sara';
-      btn.classList.remove('ativo');
-    }
-  } catch(e) { alert('Erro ao silenciar'); }
-}
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 
 async function sendMessage() {
   const input = document.getElementById('msg-input');
@@ -239,25 +239,18 @@ async function sendMessage() {
       statusEl.textContent = 'Enviado!';
       setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
       loadMessages(true);
-    } else {
-      statusEl.textContent = 'Erro: ' + (data.erro || 'Falha ao enviar');
-    }
-  } catch(e) {
-    statusEl.textContent = 'Erro de conexao';
-  } finally {
+    } else { statusEl.textContent = 'Erro: ' + (data.erro || 'Falha ao enviar'); }
+  } catch(e) { statusEl.textContent = 'Erro de conexão'; }
+  finally {
     input.disabled = false;
     document.getElementById('send-btn').disabled = false;
     input.focus();
   }
 }
 
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
+function escHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function formatTime(ts) {
-  const d = new Date(ts * 1000);
-  const now = new Date();
+  const d = new Date(ts * 1000), now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
   return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
 }
@@ -272,28 +265,24 @@ setInterval(() => { loadContacts(); if (selectedPhone) loadMessages(false); }, 3
 
 router.get('/api/conversas', autenticar, (req, res) => {
   db.all(
-    `SELECT telefone, conteudo AS ultima_mensagem, role, criado_em
-     FROM mensagens
-     WHERE id IN (SELECT MAX(id) FROM mensagens GROUP BY telefone)
-     ORDER BY criado_em DESC`,
+    `SELECT m.telefone, m.conteudo AS ultima_mensagem, m.role, m.criado_em,
+            c.nome, c.modo_humano
+     FROM mensagens m
+     LEFT JOIN contatos c ON c.telefone = m.telefone
+     WHERE m.id IN (SELECT MAX(id) FROM mensagens GROUP BY telefone)
+     ORDER BY m.criado_em DESC`,
     [],
     (err, rows) => {
       if (err) return res.status(500).json({ erro: err.message });
-      // Enriquecer com nome do contato
-      db.all(`SELECT telefone, nome FROM contatos`, [], (err2, contatos) => {
-        const mapaContatos = {};
-        (contatos || []).forEach(c => { mapaContatos[c.telefone] = c.nome; });
-        res.json(rows.map(r => ({ ...r, nome: mapaContatos[r.telefone] || null })));
-      });
+      res.json(rows);
     }
   );
 });
 
 router.get('/api/mensagens/:telefone', autenticar, (req, res) => {
-  const { telefone } = req.params;
   db.all(
     `SELECT role, conteudo, criado_em FROM mensagens WHERE telefone = ? ORDER BY criado_em ASC`,
-    [telefone],
+    [req.params.telefone],
     (err, rows) => {
       if (err) return res.status(500).json({ erro: err.message });
       res.json(rows);
@@ -303,66 +292,42 @@ router.get('/api/mensagens/:telefone', autenticar, (req, res) => {
 
 router.post('/api/enviar', autenticar, async (req, res) => {
   const { telefone, mensagem } = req.body;
-  if (!telefone || !mensagem) return res.status(400).json({ erro: 'telefone e mensagem sao obrigatorios' });
+  if (!telefone || !mensagem) return res.status(400).json({ erro: 'telefone e mensagem obrigatorios' });
   try {
     const canal = await buscarCanal(telefone);
     await enviarTexto(telefone, mensagem, canal);
     salvarMensagem(telefone, 'manual', mensagem);
     res.json({ ok: true });
   } catch (e) {
-    console.error('[dashboard] Erro ao enviar:', e.message);
     res.status(500).json({ erro: e.message });
+  }
+});
+
+router.post('/api/silenciar/:telefone', autenticar, async (req, res) => {
+  const { telefone } = req.params;
+  const modoAtual = await verificarModoHumano(telefone);
+  if (modoAtual) {
+    await desativarModoHumano(telefone);
+    res.json({ ok: true, modoHumano: false });
+  } else {
+    ativarModoHumano(telefone);
+    res.json({ ok: true, modoHumano: true });
   }
 });
 
 router.get('/aviso', autenticar, async (req, res) => {
   const aviso = await getAviso();
-  res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aviso para Sara</title>
-<style>
-  body { font-family: 'Segoe UI', sans-serif; background: #111b21; color: #e9edef; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
-  .box { background: #202c33; padding: 28px; border-radius: 12px; width: 100%; max-width: 480px; }
-  h2 { color: #00a884; margin-bottom: 6px; }
-  p { color: #8696a0; font-size: 13px; margin-bottom: 20px; }
-  textarea { width: 100%; background: #2a3942; border: none; border-radius: 8px; padding: 12px; color: #e9edef; font-size: 14px; resize: vertical; min-height: 80px; font-family: inherit; outline: none; box-sizing: border-box; }
-  .btns { display: flex; gap: 10px; margin-top: 16px; }
-  button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
-  .salvar { background: #00a884; color: #fff; }
-  .limpar { background: #2a3942; color: #e9edef; }
-  .status { margin-top: 12px; font-size: 13px; color: #00a884; text-align: center; min-height: 18px; }
-  .ativo { background: #1a3a2a; border: 1px solid #00a884; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #00a884; }
-</style>
-</head>
-<body>
-<div class="box">
-  <h2>Aviso para Sara</h2>
-  <p>Digite um aviso — a Sara vai informar os pacientes sobre sua indisponibilidade.</p>
-  ${aviso ? `<div class="ativo">Aviso ativo: <strong>${aviso}</strong></div>` : ''}
-  <textarea id="txt" placeholder="Ex: Estou em viagem, retorno na segunda-feira.">${aviso || ''}</textarea>
-  <div class="btns">
-    <button class="salvar" onclick="salvar()">Salvar aviso</button>
-    <button class="limpar" onclick="limpar()">Limpar aviso</button>
-  </div>
-  <div class="status" id="status"></div>
-</div>
-<script>
-const senha = new URLSearchParams(location.search).get('senha') || '';
-async function salvar() {
-  const txt = document.getElementById('txt').value.trim();
-  if (!txt) return;
-  await fetch('/dashboard/aviso?senha=' + senha, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ texto: txt }) });
-  document.getElementById('status').textContent = 'Aviso salvo!';
-  setTimeout(() => location.reload(), 1500);
-}
-async function limpar() {
-  await fetch('/dashboard/aviso?senha=' + senha, { method: 'DELETE' });
-  document.getElementById('status').textContent = 'Aviso removido!';
-  setTimeout(() => location.reload(), 1000);
-}
-</script>
-</body></html>`);
+  res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aviso para Sara</title>
+<style>body{font-family:'Segoe UI',sans-serif;background:#111b21;color:#e9edef;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:16px;box-sizing:border-box}.box{background:#202c33;padding:28px;border-radius:12px;width:100%;max-width:480px}h2{color:#00a884;margin-bottom:6px}p{color:#8696a0;font-size:13px;margin-bottom:20px}textarea{width:100%;background:#2a3942;border:none;border-radius:8px;padding:12px;color:#e9edef;font-size:14px;resize:vertical;min-height:80px;font-family:inherit;outline:none;box-sizing:border-box}.btns{display:flex;gap:10px;margin-top:16px}button{flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}.salvar{background:#00a884;color:#fff}.limpar{background:#2a3942;color:#e9edef}.status{margin-top:12px;font-size:13px;color:#00a884;text-align:center;min-height:18px}.ativo{background:#1a3a2a;border:1px solid #00a884;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#00a884}</style>
+</head><body><div class="box"><h2>Aviso para Sara</h2><p>Digite um aviso — a Sara vai respeitar enquanto estiver ativo.</p>
+${aviso ? `<div class="ativo">Aviso ativo: <strong>${aviso}</strong></div>` : ''}
+<textarea id="txt" placeholder="Ex: Estou em férias, retorno na segunda.">${aviso || ''}</textarea>
+<div class="btns"><button class="salvar" onclick="salvar()">Salvar aviso</button><button class="limpar" onclick="limpar()">Limpar aviso</button></div>
+<div class="status" id="status"></div></div>
+<script>const senha=new URLSearchParams(location.search).get('senha')||'';
+async function salvar(){const txt=document.getElementById('txt').value.trim();if(!txt)return;await fetch('/dashboard/aviso?senha='+senha,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:txt})});document.getElementById('status').textContent='Aviso salvo!';setTimeout(()=>location.reload(),1500);}
+async function limpar(){await fetch('/dashboard/aviso?senha='+senha,{method:'DELETE'});document.getElementById('status').textContent='Aviso removido!';setTimeout(()=>location.reload(),1000);}
+</script></body></html>`);
 });
 
 router.post('/aviso', autenticar, async (req, res) => {
@@ -374,30 +339,6 @@ router.post('/aviso', autenticar, async (req, res) => {
 router.delete('/aviso', autenticar, async (req, res) => {
   await limparAviso();
   res.json({ ok: true });
-});
-
-router.post('/api/silenciar/:telefone', autenticar, async (req, res) => {
-  const { telefone } = req.params;
-  const modoAtual = await verificarModoHumano(telefone);
-  if (modoAtual) {
-    // Desativar modo humano
-    db.run(`UPDATE contatos SET modo_humano=0 WHERE telefone=?`, [telefone], (err) => {
-      if (err) return res.status(500).json({ erro: err.message });
-      res.json({ ok: true, modoHumano: false });
-    });
-  } else {
-    // Ativar modo humano
-    ativarModoHumano(telefone);
-    res.json({ ok: true, modoHumano: true });
-  }
-});
-
-router.get('/api/limpar/:telefone', autenticar, (req, res) => {
-  const { telefone } = req.params;
-  db.run(`DELETE FROM mensagens WHERE telefone = ?`, [telefone], function(err) {
-    if (err) return res.status(500).json({ erro: err.message });
-    res.json({ ok: true, deletadas: this.changes });
-  });
 });
 
 module.exports = router;

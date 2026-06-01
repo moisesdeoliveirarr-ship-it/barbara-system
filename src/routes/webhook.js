@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const { processarMensagem } = require('../services/messageHandler');
 
+// Verificação do webhook pela Meta
+router.get('/', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    console.log('[webhook] Verificado com sucesso');
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// Receber mensagens
 router.post('/', async (req, res) => {
   res.sendStatus(200);
 
@@ -9,65 +23,19 @@ router.post('/', async (req, res) => {
     const body = req.body;
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
-    // Ignorar mensagens enviadas pelo próprio número (Sara ou Dra. Barbara)
-    const ehFromMe = body.fromMe === true || body.fromMe === 'true' ||
-                     body.isFromMe === true || body.isFromMe === 'true' ||
-                     body.isSentByMe === true || body.isSentByMe === 'true' ||
-                     body.type === 'SendedCallback';
+    if (body.object !== 'whatsapp_business_account') return;
 
-    if (ehFromMe) return;
-
-    // Ignorar callbacks de status
-    if (body.type === 'DeliveryCallback') return;
-    if (body.type === 'ReadCallback') return;
-
-    // Ignorar se o remetente é o próprio número do bot
-    const botPhone = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-    if (botPhone && body.phone && String(body.phone) === String(botPhone)) return;
-
-    // Ignorar mensagens de grupo
-    if (body.isGroup) return;
-
-    // Só processar ReceivedCallback com texto ou áudio
-    const texto = body.text?.message || body.audio?.audioUrl || null;
-    if (!texto) return;
-
-    const telefone = body.phone;
-    if (!telefone) return;
-
-    const nome = body.senderName || telefone;
-
-    console.log(`[webhook] processando mensagem de ${telefone} — ${nome}`);
-
-    let msgFormatada = {
-      from: telefone,
-      fromJid: telefone,
-      type: 'text',
-      text: { body: '' }
-    };
-
-    if (body.type === 'ReceivedCallback' && body.text?.message) {
-      msgFormatada.text.body = body.text.message;
-    } else if (body.audio?.audioUrl) {
-      msgFormatada.type = 'audio';
-      msgFormatada.audio = { id: body.audio.audioUrl };
-    } else if (body.text?.message) {
-      msgFormatada.text.body = body.text.message;
-    } else {
-      console.log('[webhook] tipo nao suportado:', body.type);
-      return;
+    for (const entry of body.entry || []) {
+      for (const change of entry.changes || []) {
+        const value = change.value;
+        for (const msg of value.messages || []) {
+          await processarMensagem(msg, value.contacts?.[0], 'whatsapp');
+        }
+      }
     }
-
-    if (msgFormatada.type === 'text' && !msgFormatada.text.body.trim()) return;
-
-    const contato = { profile: { name: nome } };
-
-    await processarMensagem(msgFormatada, contato, 'whatsapp');
   } catch (err) {
-    console.error('Erro no webhook:', err.message);
+    console.error('[webhook] Erro:', err.message);
   }
 });
-
-router.get('/', (req, res) => res.send('Webhook Barbara System ativo'));
 
 module.exports = router;
