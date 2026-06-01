@@ -51,15 +51,19 @@ async function processarMensagem(msg, contato, canal) {
 
     const historico = await buscarHistorico(telefone);
 
-    // Se agendamento já foi encaminhado, Claude responde sem ferramentas
+    // Se agendamento já foi encaminhado, Sara para de responder completamente
     const jaEncaminhado = historico.some(h => h.conteudo?.includes('[Agendamento encaminhado para Dra. Barbara]'));
+    if (jaEncaminhado) {
+      console.log(`[${telefone}] Agendamento ja encaminhado — Sara nao responde mais.`);
+      return;
+    }
 
     const { resposta, ferramentas } = await chamarClaude(telefone, nome, texto, historico);
 
     // Executar ferramentas
     let encaminhou = false;
     for (const ferramenta of ferramentas) {
-      if (ferramenta.nome === 'solicitar_agendamento' && !jaEncaminhado) {
+      if (ferramenta.nome === 'solicitar_agendamento') {
         await executarFerramenta(ferramenta, telefone, canal);
         encaminhou = true;
       }
@@ -68,7 +72,7 @@ async function processarMensagem(msg, contato, canal) {
     if (encaminhou) {
       salvarMensagem(telefone, 'user', texto);
       salvarMensagem(telefone, 'assistant', '[Agendamento encaminhado para Dra. Barbara]');
-      await enviarTexto(jidEnvio, 'Anotei tudo! Vou passar seu pedido para a Dra. Barbara.|||Ela entrará em contato em breve para confirmar o horário. Qualquer dúvida, é só falar!', canal);
+      await enviarTexto(jidEnvio, 'Anotei tudo! Vou passar seu pedido para a Dra. Bárbara.|||Ela entrará em contato em breve para confirmar o horário.', canal);
       return;
     }
 
