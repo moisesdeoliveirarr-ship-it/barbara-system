@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { getAviso, setAviso, limparAviso } = require('../db/aviso');
+const { ativarModoHumano } = require('../db/historico');
 
 let bot = null;
 
@@ -43,6 +44,20 @@ function iniciarTelegram() {
     await bot.sendMessage(msg.chat.id, `Aviso registrado:\n"${texto}"\n\nFica ativo ate voce mandar /limpar`);
   });
 
+  // Botão inline: silenciar Sara para um contato
+  bot.on('callback_query', async (query) => {
+    const data = query.data;
+    if (data && data.startsWith('silenciar:')) {
+      const telefone = data.replace('silenciar:', '');
+      await ativarModoHumano(telefone);
+      await bot.answerCallbackQuery(query.id, { text: '✅ Sara silenciada para este contato!' });
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [[{ text: '✅ Sara silenciada', callback_data: 'ok' }]] },
+        { chat_id: query.message.chat.id, message_id: query.message.message_id }
+      );
+    }
+  });
+
   bot.on('message', async (msg) => {
     if (!msg.text || msg.text.startsWith('/')) return;
 
@@ -71,4 +86,20 @@ async function notificarTelegram(texto) {
   }
 }
 
-module.exports = { iniciarTelegram, notificarTelegram };
+async function notificarAgendamento(texto, telefone) {
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!bot || !chatId) return;
+  try {
+    await bot.sendMessage(chatId, texto, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '🔇 Silenciar Sara para este contato', callback_data: `silenciar:${telefone}` }
+        ]]
+      }
+    });
+  } catch (err) {
+    console.error('[telegram] Erro ao enviar notificacao de agendamento:', err.message);
+  }
+}
+
+module.exports = { iniciarTelegram, notificarTelegram, notificarAgendamento };

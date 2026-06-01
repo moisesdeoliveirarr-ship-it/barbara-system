@@ -1,4 +1,4 @@
-const { notificarTelegram } = require('./telegram');
+const { notificarAgendamento } = require('./telegram');
 
 async function executarFerramenta(ferramenta, telefone, canal) {
   const { nome, input } = ferramenta;
@@ -17,7 +17,7 @@ async function executarFerramenta(ferramenta, telefone, canal) {
           `Horario desejado: ${horario_desejado}` +
           linhaObs +
           `\n\nAssuma a conversa no WhatsApp para confirmar o horario no Simple Dental.`;
-        await notificarTelegram(msg);
+        await notificarAgendamento(msg, telefone);
         console.log('[ferramenta] Telegram enviado para Dra. Barbara');
         break;
       }
