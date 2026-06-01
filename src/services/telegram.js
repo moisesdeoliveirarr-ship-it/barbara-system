@@ -51,9 +51,9 @@ function iniciarTelegram() {
     if (data && data.startsWith('silenciar:')) {
       const telefone = data.replace('silenciar:', '');
       await ativarModoHumano(telefone);
-      await bot.answerCallbackQuery(query.id, { text: '🔇 Sara pausada!' });
+      await bot.answerCallbackQuery(query.id, { text: '✅ Atendimento assumido!' });
       await bot.editMessageReplyMarkup(
-        { inline_keyboard: [[{ text: '▶️ Reativar Sara', callback_data: `reativar:${telefone}` }]] },
+        { inline_keyboard: [[{ text: '▶️ Devolver para Sara', callback_data: `reativar:${telefone}` }]] },
         { chat_id: query.message.chat.id, message_id: query.message.message_id }
       );
     }
@@ -61,9 +61,9 @@ function iniciarTelegram() {
     if (data && data.startsWith('reativar:')) {
       const telefone = data.replace('reativar:', '');
       await desativarModoHumano(telefone);
-      await bot.answerCallbackQuery(query.id, { text: '▶️ Sara reativada!' });
+      await bot.answerCallbackQuery(query.id, { text: '✅ Sara reativada!' });
       await bot.editMessageReplyMarkup(
-        { inline_keyboard: [[{ text: '🔇 Silenciar Sara', callback_data: `silenciar:${telefone}` }]] },
+        { inline_keyboard: [[{ text: '👤 Assumir Atendimento', callback_data: `silenciar:${telefone}` }]] },
         { chat_id: query.message.chat.id, message_id: query.message.message_id }
       );
     }
@@ -111,7 +111,7 @@ async function notificarAgendamento(texto, telefone) {
     await bot.sendMessage(chatId, texto, {
       reply_markup: {
         inline_keyboard: [[
-          { text: '🔇 Silenciar Sara para este contato', callback_data: `silenciar:${telefone}` }
+          { text: '👤 Assumir Atendimento', callback_data: `silenciar:${telefone}` }
         ]]
       }
     });
