@@ -10,7 +10,10 @@ router.post('/', async (req, res) => {
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
     // Ignorar mensagens enviadas pelo próprio sistema
-    if (body.fromMe) return;
+    if (body.fromMe === true || body.fromMe === 'true') return;
+    if (body.isFromMe === true || body.isFromMe === 'true') return;
+    if (body.isSentByMe === true || body.isSentByMe === 'true') return;
+    if (body.type === 'SendedCallback') return;
 
     // Ignorar mensagens de grupo
     if (body.isGroup) return;
