@@ -1,31 +1,23 @@
 const axios = require('axios');
 
-const BASE_URL = 'https://graph.facebook.com/v19.0';
+const EVOLUTION_URL = process.env.EVOLUTION_URL;
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'barbara-clinica';
+const EVOLUTION_KEY = process.env.EVOLUTION_API_KEY;
 
 async function enviarTexto(telefone, texto, canal = 'whatsapp') {
-  await axios.post(
-    `${BASE_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-    {
-      messaging_product: 'whatsapp',
-      to: telefone,
-      type: 'text',
-      text: { body: texto }
-    },
-    { headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` } }
-  );
+  try {
+    await axios.post(
+      `${EVOLUTION_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+      {
+        number: telefone,
+        options: { delay: 1000 },
+        textMessage: { text: texto }
+      },
+      { headers: { apikey: EVOLUTION_KEY } }
+    );
+  } catch (err) {
+    console.error('[whatsapp] Erro ao enviar:', err.message);
+  }
 }
 
-async function baixarMidiaWhatsapp(mediaId) {
-  const { data: info } = await axios.get(`${BASE_URL}/${mediaId}`, {
-    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` }
-  });
-
-  const { data: buffer } = await axios.get(info.url, {
-    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` },
-    responseType: 'arraybuffer'
-  });
-
-  return { buffer: Buffer.from(buffer), mimeType: info.mime_type };
-}
-
-module.exports = { enviarTexto, baixarMidiaWhatsapp };
+module.exports = { enviarTexto };
