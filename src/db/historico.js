@@ -81,7 +81,12 @@ function desativarModoHumano(telefone) {
       [telefone],
       (err) => {
         if (err) console.error('[db] Erro ao desativar modo humano:', err.message);
-        resolve();
+        // Limpa o registro de agendamento encaminhado para Sara poder responder de novo
+        db.run(
+          `DELETE FROM mensagens WHERE telefone=? AND conteudo='[Agendamento encaminhado para Dra. Barbara]'`,
+          [telefone],
+          () => resolve()
+        );
       }
     );
   });
