@@ -38,7 +38,7 @@ async function processarMensagem(msg, contato, canal) {
       texto = msg.text.body;
     } else if (msg.type === 'audio') {
       console.log(`[${telefone}] Audio recebido — transcrevendo...`);
-      texto = await transcreverAudio(msg.audio.id);
+      texto = await transcreverAudio(msg.audio.id); // id = audioUrl no Z-API
       if (!texto) {
         await enviarTexto(jidEnvio, 'Desculpe, nao consegui entender o audio. Pode digitar?', canal);
         return;
