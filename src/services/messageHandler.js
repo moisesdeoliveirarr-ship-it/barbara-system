@@ -1,4 +1,4 @@
-const { buscarHistorico, salvarMensagem, salvarContato, buscarCanal } = require('../db/historico');
+const { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, verificarModoHumano } = require('../db/historico');
 const { notificarTelegram } = require('./telegram');
 const { chamarClaude } = require('./claude');
 const { transcreverAudio } = require('./transcricao');
@@ -13,6 +13,13 @@ async function processarMensagem(msg, contato, canal) {
   const nome = contato?.profile?.name || 'Paciente';
 
   salvarContato(telefone, canal, nome !== 'Paciente' ? nome : null);
+
+  // Se Dra. Barbara já assumiu esse contato, Sara fica silenciosa
+  const modoHumano = await verificarModoHumano(telefone);
+  if (modoHumano) {
+    console.log(`[${telefone}] Modo humano ativo — Sara nao responde.`);
+    return;
+  }
 
   // Notificar Dra. Barbara no primeiro contato
   const historicoPre = await buscarHistorico(telefone);

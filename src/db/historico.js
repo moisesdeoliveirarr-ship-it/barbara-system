@@ -19,9 +19,12 @@ db.serialize(() => {
       telefone TEXT PRIMARY KEY,
       canal TEXT NOT NULL DEFAULT 'whatsapp',
       nome TEXT,
+      modo_humano INTEGER NOT NULL DEFAULT 0,
       atualizado_em INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     )
   `);
+  // Adiciona coluna modo_humano se já existir a tabela sem ela
+  db.run(`ALTER TABLE contatos ADD COLUMN modo_humano INTEGER NOT NULL DEFAULT 0`, () => {});
 });
 
 function buscarHistorico(telefone, limite = 20) {
@@ -62,4 +65,21 @@ function buscarCanal(telefone) {
   });
 }
 
-module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal };
+function ativarModoHumano(telefone) {
+  db.run(
+    `INSERT INTO contatos (telefone, canal, modo_humano, atualizado_em) VALUES (?, 'whatsapp', 1, strftime('%s','now'))
+     ON CONFLICT(telefone) DO UPDATE SET modo_humano=1, atualizado_em=strftime('%s','now')`,
+    [telefone],
+    (err) => { if (err) console.error('[db] Erro ao ativar modo humano:', err.message); }
+  );
+}
+
+function verificarModoHumano(telefone) {
+  return new Promise((resolve) => {
+    db.get(`SELECT modo_humano FROM contatos WHERE telefone = ?`, [telefone], (err, row) => {
+      resolve(row?.modo_humano === 1);
+    });
+  });
+}
+
+module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, ativarModoHumano, verificarModoHumano };

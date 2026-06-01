@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { processarMensagem } = require('../services/messageHandler');
+const { ativarModoHumano, verificarModoHumano } = require('../db/historico');
 
 router.post('/', async (req, res) => {
   res.sendStatus(200);
@@ -9,11 +10,18 @@ router.post('/', async (req, res) => {
     const body = req.body;
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
-    // Ignorar mensagens enviadas pelo próprio sistema (todas as variantes do Z-API)
-    if (body.fromMe === true || body.fromMe === 'true') return;
-    if (body.isFromMe === true || body.isFromMe === 'true') return;
-    if (body.isSentByMe === true || body.isSentByMe === 'true') return;
-    if (body.type === 'SendedCallback') return;
+    // Se mensagem foi enviada pelo dono do número (Dra. Barbara), ativar modo humano e parar
+    const ehFromMe = body.fromMe === true || body.fromMe === 'true' ||
+                     body.isFromMe === true || body.isFromMe === 'true' ||
+                     body.isSentByMe === true || body.isSentByMe === 'true' ||
+                     body.type === 'SendedCallback';
+
+    if (ehFromMe) {
+      if (body.phone) ativarModoHumano(body.phone);
+      return;
+    }
+
+    // Ignorar callbacks de status
     if (body.type === 'DeliveryCallback') return;
     if (body.type === 'ReadCallback') return;
 
