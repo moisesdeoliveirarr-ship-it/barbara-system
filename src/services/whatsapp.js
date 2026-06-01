@@ -16,6 +16,11 @@ async function enviarTexto(telefone, texto, canal = 'whatsapp') {
       {
         phone: numero,
         message: texto
+      },
+      {
+        headers: {
+          'Client-Token': process.env.ZAPI_CLIENT_TOKEN
+        }
       }
     );
   } catch (err) {
