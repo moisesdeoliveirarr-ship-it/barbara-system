@@ -22,12 +22,13 @@ router.post('/', async (req, res) => {
     // Ignorar mensagens enviadas pelo próprio sistema
     if (msg.key?.fromMe) return;
 
-    // Montar objeto compatível com o messageHandler
-    const telefone = msg.key?.remoteJid?.replace('@s.whatsapp.net', '');
-    if (!telefone) return;
-
     // Ignorar grupos
     if (msg.key?.remoteJid?.includes('@g.us')) return;
+
+    // Extrair telefone — suporta @s.whatsapp.net e @lid
+    const remoteJid = msg.key?.remoteJid || '';
+    const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+    if (!telefone) return;
 
     const contato = {
       profile: {
