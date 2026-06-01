@@ -9,6 +9,7 @@ const emProcessamento = new Map();
 
 async function processarMensagem(msg, contato, canal) {
   const telefone = msg.from;
+  const jidEnvio = msg.fromJid || msg.from; // JID completo para envio via Evolution API
   const nome = contato?.profile?.name || 'Paciente';
 
   salvarContato(telefone, canal, nome !== 'Paciente' ? nome : null);
@@ -39,12 +40,12 @@ async function processarMensagem(msg, contato, canal) {
       console.log(`[${telefone}] Audio recebido — transcrevendo...`);
       texto = await transcreverAudio(msg.audio.id);
       if (!texto) {
-        await enviarTexto(telefone, 'Desculpe, nao consegui entender o audio. Pode digitar?', canal);
+        await enviarTexto(jidEnvio, 'Desculpe, nao consegui entender o audio. Pode digitar?', canal);
         return;
       }
       console.log(`[${telefone}] Transcricao: "${texto}"`);
     } else {
-      await enviarTexto(telefone, 'Por enquanto so consigo responder texto e audio. Como posso ajudar?', canal);
+      await enviarTexto(jidEnvio, 'Por enquanto so consigo responder texto e audio. Como posso ajudar?', canal);
       return;
     }
 
@@ -67,14 +68,14 @@ async function processarMensagem(msg, contato, canal) {
     if (encaminhou) {
       salvarMensagem(telefone, 'user', texto);
       salvarMensagem(telefone, 'assistant', '[Agendamento encaminhado para Dra. Barbara]');
-      await enviarTexto(telefone, 'Anotei tudo! Vou passar seu pedido para a Dra. Barbara.|||Ela entrará em contato em breve para confirmar o horário. Qualquer dúvida, é só falar!', canal);
+      await enviarTexto(jidEnvio, 'Anotei tudo! Vou passar seu pedido para a Dra. Barbara.|||Ela entrará em contato em breve para confirmar o horário. Qualquer dúvida, é só falar!', canal);
       return;
     }
 
     if (resposta) {
       const partes = resposta.split('|||').map(p => p.trim()).filter(p => p.length > 0);
       for (const parte of partes) {
-        await enviarTexto(telefone, parte, canal);
+        await enviarTexto(jidEnvio, parte, canal);
         if (partes.length > 1) await new Promise(r => setTimeout(r, 1500));
       }
     }

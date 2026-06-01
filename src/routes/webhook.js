@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { processarMensagem } = require('../services/messageHandler');
 
-// Evolution API envia POST com o evento
 router.post('/', async (req, res) => {
   res.sendStatus(200);
 
@@ -10,22 +9,23 @@ router.post('/', async (req, res) => {
     const body = req.body;
     console.log('[webhook] recebido:', JSON.stringify(body, null, 2));
 
-    // Evolution API v1.7.4 — formato MESSAGES_UPSERT
     if (body.event !== 'messages.upsert') return;
 
     const data = body.data;
     if (!data) return;
 
-    // data é o objeto principal com key, pushName, message
     if (data.key?.fromMe) return;
     if (data.key?.remoteJid?.includes('@g.us')) return;
 
-    // Extrair telefone — suporta @s.whatsapp.net e @lid
     const remoteJid = data.key?.remoteJid || '';
+    if (!remoteJid) return;
+
+    // Para envio: usar o JID completo (Evolution API aceita @lid e @s.whatsapp.net)
+    // Para identificação interna: limpar o sufixo
     const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
     if (!telefone) return;
 
-    console.log(`[webhook] processando mensagem de ${telefone}`);
+    console.log(`[webhook] processando mensagem de ${telefone} (jid: ${remoteJid})`);
 
     const contato = {
       profile: {
@@ -33,9 +33,9 @@ router.post('/', async (req, res) => {
       }
     };
 
-    // Montar mensagem no formato esperado pelo messageHandler
     let msgFormatada = {
       from: telefone,
+      fromJid: remoteJid, // JID completo para envio
       type: 'text',
       text: { body: '' }
     };
@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
     } else if (data.message?.imageMessage?.caption) {
       msgFormatada.text.body = data.message.imageMessage.caption;
     } else {
-      console.log('[webhook] tipo de mensagem nao suportado:', data.messageType);
+      console.log('[webhook] tipo nao suportado:', data.messageType);
       return;
     }
 
@@ -62,9 +62,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET para verificação simples
-router.get('/', (req, res) => {
-  res.send('Webhook Barbara System ativo');
-});
+router.get('/', (req, res) => res.send('Webhook Barbara System ativo'));
 
 module.exports = router;
