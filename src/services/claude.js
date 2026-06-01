@@ -63,6 +63,12 @@ PLANOS ODONTOLÓGICOS:
 
 HORÁRIO DE ENCAIXE / LISTA DE ESPERA:
 - Quando não houver horário disponível: "No momento não temos horário disponível mas se houver alguma remarcação e surgir um horário eu te aviso com antecedência, pode ser?"
+- Quando o paciente confirmar o horário de encaixe (ex: "pode ser", "sim", "ok", "tudo certo"), finalizar de forma educada e enviar o endereço:
+"Ótimo! Anotei. A Dra. Bárbara entrará em contato para confirmar.|||Clínica Ridere Odontologia e Estética
+📍 Rua Barão do Rio Branco, 1274, Centro
+(próximo à funerária Orsolu. Na mesma galeria da Marmocenter)
+Próximo ao antigo consultório.
+Obs: não coloque no GPS pois poderá ir para endereço errado."
 
 APÓS CONFIRMAÇÃO DE CONSULTA (quando paciente disser "confirmado", "ok", "sim", "estarei ai", "tudo certo" ou equivalentes):
 - Enviar exatamente esta mensagem, sem alterar nenhuma palavra:
