@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { buscarHistorico, salvarMensagem, buscarCanal } = require('../db/historico');
+const { buscarHistorico, salvarMensagem, buscarCanal, ativarModoHumano, verificarModoHumano } = require('../db/historico');
 const { getAviso, setAviso, limparAviso } = require('../db/aviso');
 const { enviarTexto } = require('../services/whatsapp');
 const sqlite3 = require('sqlite3').verbose();
@@ -50,6 +50,9 @@ router.get('/', autenticar, (req, res) => {
   #chat-header-info { flex: 1; }
   #chat-header-name { font-size: 15px; font-weight: 600; }
   #chat-header-phone { font-size: 12px; color: #8696a0; }
+  #btn-silenciar { background: #2a3942; border: none; border-radius: 8px; padding: 7px 14px; color: #e9edef; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  #btn-silenciar.ativo { background: #8b0000; color: #fff; }
+  #btn-silenciar:hover { opacity: 0.85; }
   #messages { flex: 1; overflow-y: auto; padding: 12px 8%; display: flex; flex-direction: column; gap: 4px; }
   .bubble { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; word-wrap: break-word; position: relative; }
   .bubble.user { background: #202c33; align-self: flex-start; border-top-left-radius: 2px; }
@@ -143,6 +146,7 @@ function renderChatPanel(phone, name) {
         <div id="chat-header-name">\${escHtml(name)}</div>
         <div id="chat-header-phone">\${escHtml(phone)}</div>
       </div>
+      <button id="btn-silenciar" onclick="toggleSilenciar()">🔇 Silenciar Sara</button>
     </div>
     <div id="messages"><div id="loading">Carregando mensagens...</div></div>
     <div id="send-status"></div>
@@ -195,6 +199,22 @@ function renderMessages(msgs, scrollBottom) {
 
 function handleKey(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+async function toggleSilenciar() {
+  if (!selectedPhone) return;
+  const btn = document.getElementById('btn-silenciar');
+  try {
+    const res = await fetch(API('/dashboard/api/silenciar/' + encodeURIComponent(selectedPhone)), { method: 'POST' });
+    const data = await res.json();
+    if (data.modoHumano) {
+      btn.textContent = '🔇 Sara silenciada';
+      btn.classList.add('ativo');
+    } else {
+      btn.textContent = '🔇 Silenciar Sara';
+      btn.classList.remove('ativo');
+    }
+  } catch(e) { alert('Erro ao silenciar'); }
 }
 
 async function sendMessage() {
@@ -354,6 +374,22 @@ router.post('/aviso', autenticar, async (req, res) => {
 router.delete('/aviso', autenticar, async (req, res) => {
   await limparAviso();
   res.json({ ok: true });
+});
+
+router.post('/api/silenciar/:telefone', autenticar, async (req, res) => {
+  const { telefone } = req.params;
+  const modoAtual = await verificarModoHumano(telefone);
+  if (modoAtual) {
+    // Desativar modo humano
+    db.run(`UPDATE contatos SET modo_humano=0 WHERE telefone=?`, [telefone], (err) => {
+      if (err) return res.status(500).json({ erro: err.message });
+      res.json({ ok: true, modoHumano: false });
+    });
+  } else {
+    // Ativar modo humano
+    ativarModoHumano(telefone);
+    res.json({ ok: true, modoHumano: true });
+  }
 });
 
 router.get('/api/limpar/:telefone', autenticar, (req, res) => {
