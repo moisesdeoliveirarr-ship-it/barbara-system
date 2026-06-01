@@ -100,4 +100,13 @@ function verificarModoHumano(telefone) {
   });
 }
 
-module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, ativarModoHumano, desativarModoHumano, verificarModoHumano };
+function resetarTodosModoHumano() {
+  return new Promise((resolve) => {
+    db.run(`UPDATE contatos SET modo_humano=0`, [], (err) => {
+      if (err) console.error('[db] Erro ao resetar modo humano:', err.message);
+      resolve();
+    });
+  });
+}
+
+module.exports = { buscarHistorico, salvarMensagem, salvarContato, buscarCanal, ativarModoHumano, desativarModoHumano, verificarModoHumano, resetarTodosModoHumano };

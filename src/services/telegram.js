@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { getAviso, setAviso, limparAviso } = require('../db/aviso');
-const { ativarModoHumano, desativarModoHumano } = require('../db/historico');
+const { ativarModoHumano, desativarModoHumano, resetarTodosModoHumano } = require('../db/historico');
 
 let bot = null;
 
@@ -74,6 +74,12 @@ function iniciarTelegram() {
     const telefone = match[1].trim();
     await desativarModoHumano(telefone);
     await bot.sendMessage(msg.chat.id, `▶️ Sara reativada para o contato ${telefone}.`);
+  });
+
+  // Comando /reativar_todos — reseta todos os contatos silenciados
+  bot.onText(/\/reativar_todos/, async (msg) => {
+    await resetarTodosModoHumano();
+    await bot.sendMessage(msg.chat.id, '✅ Sara reativada para todos os contatos!');
   });
 
   bot.on('message', async (msg) => {
